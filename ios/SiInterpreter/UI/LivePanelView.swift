@@ -53,7 +53,7 @@ struct LivePanelView: View {
             .foregroundColor(engine.live.isEmpty ? Theme.faint : Theme.live)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
-            .background(Theme.cell2, cornerRadius: 12)
+            .cellBackground(Theme.cell2, cornerRadius: 12)
     }
 
     private var liveText: String {

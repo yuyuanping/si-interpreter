@@ -110,6 +110,13 @@ final class InterpreterEngine: ObservableObject {
             // the big encoders. A null gate runs "always feed" mode.
             self.gate = VadGate(path: vadPath, sampleRate: 16000)
             self.log.info("started gate.enabled=\(self.gate?.enabled == true)")
+            // open the mic BEFORE the workers: the hop timer pulls from the capture
+            // pipe, so without this it would just find an empty pipe forever
+            if let err = self.capture.start(sampleRate: 16000, hopMs: self.config.hopMs) {
+                self.log.error("mic start failed: \(String(describing: err), privacy: .public)")
+                self.publish { self.state = .error("麦克风启动失败: \(err.localizedDescription)") }
+                return
+            }
             self.publish { self.state = .running }
             self.startWorkers()
         }
@@ -213,7 +220,7 @@ final class InterpreterEngine: ObservableObject {
         let now = Date()
         if now.timeIntervalSince(lastDbLog) > 5 {
             lastDbLog = now
-            log.info("level=\(String(format: "%.1f", db), privacy: .public) dBFS peak=\(String(format: "%.1f", segPeakDb), privacy: .public) heard=\(String(format: "%.1f", Double(segSamples) / 16000), privacy: .public)s")
+            log.info("level=\(String(format: "%.1f", db), privacy: .public) dBFS peak=\(String(format: "%.1f", self.segPeakDb), privacy: .public) heard=\(String(format: "%.1f", Double(self.segSamples) / 16000), privacy: .public)s")
         }
 
         // VAD gate: feed the hop to the gate FIRST. Only when it reports speech do we
@@ -269,7 +276,7 @@ final class InterpreterEngine: ObservableObject {
             currentLive = ""
             publish { self.live = "" }
             let why = forced ? "FORCED" : (vadSegment != nil ? "vad" : "endpoint")
-            log.info("cut \(why, privacy: .public) dur=\(String(format: "%.1f", Double(segSamples) / 16000), privacy: .public)s peak=\(String(format: "%.1f", segPeakDb), privacy: .public)dB stream=[\(streamed, privacy: .public)]")
+            log.info("cut \(why, privacy: .public) dur=\(String(format: "%.1f", Double(self.segSamples) / 16000), privacy: .public)s peak=\(String(format: "%.1f", self.segPeakDb), privacy: .public)dB stream=[\(streamed, privacy: .public)]")
             segSamples = 0
             segPeakDb = -120
 

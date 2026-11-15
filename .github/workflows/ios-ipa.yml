@@ -39,13 +39,17 @@ jobs:
         run: cd ios && xcodegen generate
 
       - name: Build unsigned .app
+        shell: bash
         run: |
           cd ios
+          set -o pipefail
           xcodebuild -project SiInterpreter.xcodeproj -scheme SiInterpreter \
             -configuration Release -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
-            build 2>&1 | tail -60
+            build > /tmp/xc.log 2>&1 || { tail -120 /tmp/xc.log; exit 1; }
+          grep -E "error:" /tmp/xc.log && { echo "errors above despite BUILD SUCCEEDED"; exit 1; } || true
+          echo "BUILD OK"
 
       - name: Package unsigned .ipa
         run: |
@@ -53,6 +57,7 @@ jobs:
           mkdir Payload
           cp -R SiInterpreter.app Payload/
           zip -qry "$GITHUB_WORKSPACE/SiInterpreter-unsigned.ipa" Payload
+          ls -la "$GITHUB_WORKSPACE/SiInterpreter-unsigned.ipa"
 
       - uses: actions/upload-artifact@v4
         with:

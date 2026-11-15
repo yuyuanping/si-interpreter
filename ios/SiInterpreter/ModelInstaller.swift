@@ -99,7 +99,7 @@ final class ModelInstaller: ObservableObject {
             FileManager.default.createFile(atPath: part.path, contents: nil)
             let fh = try FileHandle(forWritingTo: part)
             defer { try? fh.close() }
-            if append { fh.seek(toOffset: UInt64(start)) } else { try? fh.truncate(atOffset: 0) }
+            if append { try fh.seek(toOffset: UInt64(start)) } else { try? fh.truncate(atOffset: 0) }
 
             var written = start
             var lastTick = Date()

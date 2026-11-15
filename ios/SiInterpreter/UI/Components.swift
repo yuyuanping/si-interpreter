@@ -32,7 +32,7 @@ struct Card<Content: View>: View {
         VStack(alignment: .leading, spacing: 4) { content }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
-            .background(Theme.cell, cornerRadius: 12)
+            .cellBackground(Theme.cell, cornerRadius: 12)
     }
 }
 
@@ -63,7 +63,7 @@ struct LangChip: View {
             .foregroundColor(Theme.fg)
             .padding(.horizontal, 18)
             .padding(.vertical, 10)
-            .background(selected ? Theme.accent : Theme.cell2, cornerRadius: 20)
+            .cellBackground(selected ? Theme.accent : Theme.cell2, cornerRadius: 20)
             .onTapGesture(perform: action)
     }
 }
@@ -109,14 +109,14 @@ struct UtteranceRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 5)
         .padding(12)
-        .background(Theme.cell, cornerRadius: 10)
+        .cellBackground(Theme.cell, cornerRadius: 10)
     }
 }
 
 extension View {
-    /// cornerRadius on a background shape (the `.background(_, cornerRadius:)`
-    /// overload used above is expressed this way for iOS 16 compatibility)
-    func background(_ color: Color, cornerRadius: CGFloat) -> some View {
+    /// filled rounded background — named to stay unambiguous against SwiftUI's own
+    /// background overloads
+    func cellBackground(_ color: Color, cornerRadius: CGFloat) -> some View {
         background(RoundedRectangle(cornerRadius: cornerRadius).fill(color))
     }
 }

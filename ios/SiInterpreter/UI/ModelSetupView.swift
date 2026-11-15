@@ -100,10 +100,10 @@ struct IdlePanelView: View {
                 Text("方向").sectionStyle()
                 Card {
                     HStack(spacing: 10) {
-                        LangChip("英 → 中", selected: src == "en" && tgt == "zh") {
+                        LangChip(text: "英 → 中", selected: src == "en" && tgt == "zh") {
                             src = "en"; tgt = "zh"
                         }
-                        LangChip("中 → 英", selected: src == "zh" && tgt == "en") {
+                        LangChip(text: "中 → 英", selected: src == "zh" && tgt == "en") {
                             src = "zh"; tgt = "en"
                         }
                     }
