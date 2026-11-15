@@ -24,4 +24,11 @@ final class PipelineConfig {
         get { d.bool(forKey: "speak") }
         set { d.set(newValue, forKey: "speak") }
     }
+
+    /// trailing silence (seconds) that ends a sentence. The old hard-coded 0.5 chopped
+    /// speakers off mid-sentence on any thinking pause; the idle panel exposes presets.
+    var cutSilenceSec: Float {
+        get { d.object(forKey: "cutSilenceSec") as? Float ?? 1.0 }
+        set { d.set(newValue, forKey: "cutSilenceSec") }
+    }
 }

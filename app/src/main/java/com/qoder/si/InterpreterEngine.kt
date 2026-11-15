@@ -135,7 +135,7 @@ class InterpreterEngine(
                 // build the gate on the same background dispatcher as ASR init: Silero VAD is
                 // a tiny (~2 MB) ONNX model but its native ctor still touches disk+ONNXRuntime,
                 // so keep it off the main thread for the same reason as the 175 MB encoder.
-                gate = VadGate(vadPath, asr.sampleRate)
+                gate = VadGate(vadPath, asr.sampleRate, config.cutSilenceSec)
             }
             Log.i(TAG, "started gate.enabled=${gate?.enabled == true}")
             _state.value = EngineState.Running

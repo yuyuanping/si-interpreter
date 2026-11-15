@@ -101,14 +101,16 @@ final class InterpreterEngine: ObservableObject {
         let vadPath = self.vadPath
         workerQueue.async { [weak self] in
             guard let self else { return }
-            guard let asrPaths, self.asr.initialize(asrPaths) else {
+            guard let asrPaths, self.asr.initialize(asrPaths,
+                                                  cutSilenceSec: config.cutSilenceSec) else {
                 self.publish { self.state = .error("识别模型加载失败") }
                 return
             }
             // Silero VAD is a tiny (~2 MB) ONNX model but its native ctor still touches
             // disk+onnxruntime, so keep it off the main thread for the same reason as
             // the big encoders. A null gate runs "always feed" mode.
-            self.gate = VadGate(path: vadPath, sampleRate: 16000)
+            self.gate = VadGate(path: vadPath, sampleRate: 16000,
+                                cutSilenceSec: config.cutSilenceSec)
             self.log.info("started gate.enabled=\(self.gate?.enabled == true)")
             // open the mic BEFORE the workers: the hop timer pulls from the capture
             // pipe, so without this it would just find an empty pipe forever

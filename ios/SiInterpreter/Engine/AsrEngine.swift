@@ -37,7 +37,7 @@ final class AsrEngine {
     let sampleRate = 16000
 
     /// Builds the recognizer; false when the model files are unusable.
-    func initialize(_ paths: ModelPaths) -> Bool {
+    func initialize(_ paths: ModelPaths, cutSilenceSec: Float = 1.0) -> Bool {
         guard recognizer == nil else { return true }
         let cs = CStrings()
         defer { cs.freeAll() }
@@ -56,8 +56,13 @@ final class AsrEngine {
         // rather than "transcribe after they stop talking". rule2 (trailing silence)
         // is the one that fires during natural speech pauses.
         cfg.enable_endpoint = 1
-        cfg.rule1_min_trailing_silence = 2.4   // long pause -> cut
-        cfg.rule2_min_trailing_silence = 1.2   // speech + shorter pause -> cut
+        // With the VAD gate active the recognizer is never fed during silence, so its
+        // silence clock freezes and these rules only bite in the degraded no-VAD mode;
+        // the +0.3 s margin keeps the VAD (which hands complete segment audio to
+        // SenseVoice) winning whenever both clocks run.
+        let rule2Silence = cutSilenceSec + 0.3
+        cfg.rule1_min_trailing_silence = rule2Silence
+        cfg.rule2_min_trailing_silence = rule2Silence
         cfg.rule3_min_utterance_length = 20    // never let a segment exceed 20 s
 
         guard let rec = SherpaOnnxCreateOnlineRecognizer(&cfg) else { return false }
@@ -130,7 +135,7 @@ final class VadGate {
     private var vad: OpaquePointer?
     let enabled: Bool
 
-    init(path: VadPath?, sampleRate: Int) {
+    init(path: VadPath?, sampleRate: Int, cutSilenceSec: Float = 1.0) {
         guard let p = path, FileManager.default.fileExists(atPath: p.model) else {
             enabled = false
             return
@@ -144,10 +149,10 @@ final class VadGate {
         // on -25 dB ambient rumble and produced empty cuts (peak=-24 text=[]). 0.6 keeps
         // VAD honest — it should fire on voiced frames, not room tone.
         cfg.silero_vad.threshold = 0.6
-        // 0.5 s trailing silence -> segment end. Shorter than the ASR's rule2 (1.2 s)
-        // deliberately: the VAD is the primary cut signal now, and 0.5 s of real
-        // silence after speech is a trustworthy sentence boundary in interpretation.
-        cfg.silero_vad.min_silence_duration = 0.5
+        // trailing silence -> segment end. The VAD is the primary cut signal, so this
+        // carries the user's cut-silence knob verbatim: 0.5 s (the original fixed value)
+        // chopped mid-sentence on any thinking pause.
+        cfg.silero_vad.min_silence_duration = cutSilenceSec
         cfg.silero_vad.min_speech_duration = 0.25
         cfg.silero_vad.window_size = 512
         cfg.silero_vad.max_speech_duration = 8

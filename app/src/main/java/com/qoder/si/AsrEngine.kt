@@ -61,7 +61,7 @@ data class MtPaths(val model: String) {
  *  - getResult() returns the FULL text of the current utterance every time, which is why
  *    the UI replaces rather than appends the live segment
  */
-class AsrEngine(private val paths: ModelPaths) {
+class AsrEngine(private val paths: ModelPaths, private val cutSilenceSec: Float = 1.0f) {
 
     private var recognizer: OnlineRecognizer? = null
     private var stream: OnlineStream? = null
@@ -73,6 +73,13 @@ class AsrEngine(private val paths: ModelPaths) {
         Log.i(TAG, "init paths enc=${paths.encoder.takeLast(40)} exists=${java.io.File(paths.encoder).isFile} " +
             "encBytes=${java.io.File(paths.encoder).length()} dec=${java.io.File(paths.decoder).isFile} " +
             "join=${java.io.File(paths.joiner).isFile} tok=${java.io.File(paths.tokens).isFile}")
+        // Endpoint rules are what make this feel like simultaneous interpretation
+        // rather than "transcribe after they stop talking". With the VAD gate active
+        // the recognizer is never fed during silence, so its silence clock freezes and
+        // these rules only bite in the degraded no-VAD mode; the +0.3 s margin keeps the
+        // VAD (which hands complete segment audio to SenseVoice) winning whenever both
+        // clocks run.
+        val rule2Silence = cutSilenceSec + 0.3f
         val cfg = OnlineRecognizerConfig(
             featConfig = FeatureConfig(sampleRate = sampleRate, featureDim = 80, dither = 0f),
             modelConfig = OnlineModelConfig(
@@ -86,12 +93,10 @@ class AsrEngine(private val paths: ModelPaths) {
                 debug = false,
                 provider = "cpu",
             ),
-            // Endpoint rules are what make this feel like simultaneous interpretation
-            // rather than "transcribe after they stop talking". rule2 (trailing silence)
-            // is the one that fires during natural speech pauses.
+            // rule1/rule2 share the trailing-silence threshold; rule3 caps a segment
             endpointConfig = EndpointConfig(
-                rule1 = EndpointRule(false, 2.4f, 0f),  // long pause -> cut
-                rule2 = EndpointRule(true, 1.2f, 0f),   // speech + shorter pause -> cut
+                rule1 = EndpointRule(false, rule2Silence, 0f),
+                rule2 = EndpointRule(true, rule2Silence, 0f),
                 rule3 = EndpointRule(false, 0f, 20f),   // never let a segment exceed 20 s
             ),
             enableEndpoint = true,
@@ -165,7 +170,7 @@ class AsrEngine(private val paths: ModelPaths) {
  * A null instance (no VAD model installed) means "always feed": the pipeline degrades to the
  * original ungated behaviour rather than refusing to run.
  */
-class VadGate(path: VadPath?, sampleRate: Int) {
+class VadGate(path: VadPath?, sampleRate: Int, cutSilenceSec: Float = 1.0f) {
 
     private val vad: Vad? = path?.let { p ->
         val cfg = VadModelConfig(
@@ -175,10 +180,10 @@ class VadGate(path: VadPath?, sampleRate: Int) {
                 // fired on -25 dB ambient rumble and produced empty cuts (peak=-24 text=[]).
                 // 0.6 keeps VAD honest — it should fire on voiced frames, not room tone.
                 threshold = 0.6f,
-                // 0.5 s trailing silence -> segment end. Longer than the ASR's rule2 (1.2 s)
-                // deliberately: the VAD is the primary cut signal now, and 0.5 s of real
-                // silence after speech is a trustworthy sentence boundary in interpretation.
-                minSilenceDuration = 0.5f,
+                // trailing silence -> segment end. The VAD is the primary cut signal, so
+                // this carries the user's 断句停顿 knob verbatim: 0.5 s (the original
+                // fixed value) chopped mid-sentence on any thinking pause.
+                minSilenceDuration = cutSilenceSec,
                 minSpeechDuration = 0.25f,
                 windowSize = 512,
                 // cap a segment at 8 s so a long run-on speaker still gets streamed out in

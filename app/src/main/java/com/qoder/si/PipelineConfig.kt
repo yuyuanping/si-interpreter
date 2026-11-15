@@ -20,4 +20,9 @@ class PipelineConfig(context: Context) {
 
     var speakTranslation: Boolean = sp.getBoolean("speak", false)
         set(v) { field = v; sp.edit().putBoolean("speak", v).apply() }
+
+    /** trailing silence (seconds) that ends a sentence. The old hard-coded 0.5 chopped
+     *  speakers off mid-sentence on any thinking pause; the idle panel exposes presets. */
+    var cutSilenceSec: Float = sp.getFloat("cutSilenceSec", 1.0f)
+        set(v) { field = v; sp.edit().putFloat("cutSilenceSec", v).apply() }
 }

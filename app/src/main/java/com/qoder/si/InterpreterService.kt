@@ -110,7 +110,7 @@ class InterpreterService : android.app.Service() {
             // real on-device MT when the 1.1 GB GGUF is present; the placeholder only marks
             // turns otherwise — it is never a silent fallback that pretends to translate
             val translator: Translator = if (mtPath != null) LlamaTranslator(mtPath) else PlaceholderTranslator()
-            engine = InterpreterEngine(this, AsrEngine(paths), translator, config, vadPath, svPath)
+            engine = InterpreterEngine(this, AsrEngine(paths, config.cutSilenceSec), translator, config, vadPath, svPath)
             Log.i(TAG, "engine created bundle=$bundle paths=$paths vad=${vadPath?.model ?: "none"} " +
                 "sv=${svPath?.model ?: "none"} mt=${mtPath?.model ?: "none"}")
         }

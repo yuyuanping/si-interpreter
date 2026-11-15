@@ -92,11 +92,13 @@ struct IdlePanelView: View {
 
     @State private var src = "en"
     @State private var tgt = "zh"
+    @State private var cut: Float = 1.0
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 installedList
+                    .onAppear { cut = session.config.cutSilenceSec }
                 Text("方向").sectionStyle()
                 Card {
                     HStack(spacing: 10) {
@@ -120,6 +122,22 @@ struct IdlePanelView: View {
                          : "安装下方翻译模型后即可离线翻译；未安装时译文处显示占位标记。")
                         .font(.system(size: 12))
                         .foregroundColor(mtEngine != nil ? Theme.ok : Theme.warn)
+                        .padding(.top, 8)
+                }
+
+                Text("断句停顿").sectionStyle()
+                Card {
+                    HStack(spacing: 10) {
+                        ForEach([Float(0.5), 1.0, 1.5, 2.5], id: \.self) { v in
+                            LangChip(text: String(format: "%.1fs", v), selected: cut == v) {
+                                cut = v
+                                session.config.cutSilenceSec = v
+                            }
+                        }
+                    }
+                    Text("说话停顿超过该时长就按句尾切句并翻译。句子被切得太碎就调大，译文会相应出得稍慢。")
+                        .font(.system(size: 12))
+                        .foregroundColor(Theme.dim)
                         .padding(.top, 8)
                 }
 

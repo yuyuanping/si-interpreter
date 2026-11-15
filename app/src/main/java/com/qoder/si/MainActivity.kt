@@ -220,6 +220,7 @@ private fun IdlePanel(
 ) {
     var src by remember { mutableStateOf(config.sourceLang) }
     var tgt by remember { mutableStateOf(config.targetLang) }
+    var cut by remember { mutableStateOf(config.cutSilenceSec) }
 
     InstalledList(store)
     Spacer(Modifier.height(14.dp))
@@ -243,6 +244,18 @@ private fun IdlePanel(
             color = if (mtEngine != null) Ok else Warn,
             fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp),
         )
+    }
+    Spacer(Modifier.height(14.dp))
+
+    Section("断句停顿")
+    Card {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            listOf(0.5f, 1.0f, 1.5f, 2.5f).forEach { v ->
+                LangChip("${v}s", cut == v) { cut = v; config.cutSilenceSec = v }
+            }
+        }
+        Text("说话停顿超过该时长就按句尾切句并翻译。句子被切得太碎就调大，译文会相应出得稍慢。",
+            color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
     }
     Spacer(Modifier.height(14.dp))
 
