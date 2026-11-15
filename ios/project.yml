@@ -29,11 +29,6 @@ targets:
       # module map, so Swift imports it as `import SherpaOnnxC`
       - framework: Frameworks/SherpaOnnxC.xcframework
         embed: true
-      # llama.cpp static libs produced by scripts/build-llama.sh
-      - framework: llama-libs/libllama.a
-      - framework: llama-libs/libggml.a
-      - framework: llama-libs/libggml-base.a
-      - framework: llama-libs/libggml-cpu.a
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.qoder.si.ios
@@ -44,6 +39,11 @@ targets:
         SWIFT_OBJC_BRIDGING_HEADER: SiInterpreter/Native/SiInterpreter-Bridging.h
         TARGETED_DEVICE_FAMILY: "1"
         ENABLE_USER_SCRIPT_SANDBOXING: NO
+        # llama.cpp static libs from scripts/build-llama.sh, linked by explicit
+        # archive path — xcodegen's framework: entries only emit -F (framework
+        # search path), which ld ignores for -l, hence "library 'llama' not found".
+        # Referencers before dependees: llama -> common -> ggml -> backends.
+        OTHER_LDFLAGS: ["$(SRCROOT)/llama-libs/libllama.a", "$(SRCROOT)/llama-libs/libllama-common.a", "$(SRCROOT)/llama-libs/libllama-common-base.a", "$(SRCROOT)/llama-libs/libvendor-hash.a", "$(SRCROOT)/llama-libs/libcpp-httplib.a", "$(SRCROOT)/llama-libs/libggml.a", "$(SRCROOT)/llama-libs/libggml-base.a", "$(SRCROOT)/llama-libs/libggml-cpu.a"]
     info:
       path: SiInterpreter/Info.plist
       properties:
