@@ -43,7 +43,9 @@ targets:
         # archive path — xcodegen's framework: entries only emit -F (framework
         # search path), which ld ignores for -l, hence "library 'llama' not found".
         # Referencers before dependees: llama -> common -> ggml -> backends.
-        OTHER_LDFLAGS: ["$(SRCROOT)/llama-libs/libllama.a", "$(SRCROOT)/llama-libs/libllama-common.a", "$(SRCROOT)/llama-libs/libllama-common-base.a", "$(SRCROOT)/llama-libs/libvendor-hash.a", "$(SRCROOT)/llama-libs/libcpp-httplib.a", "$(SRCROOT)/llama-libs/libggml.a", "$(SRCROOT)/llama-libs/libggml-base.a", "$(SRCROOT)/llama-libs/libggml-cpu.a"]
+        # Accelerate: ggml-cpu's vDSP kernels need it at link time. GGML_BLAS is
+        # disabled in the build script so no blas registry symbol is referenced.
+        OTHER_LDFLAGS: ["$(SRCROOT)/llama-libs/libllama.a", "$(SRCROOT)/llama-libs/libllama-common.a", "$(SRCROOT)/llama-libs/libllama-common-base.a", "$(SRCROOT)/llama-libs/libvendor-hash.a", "$(SRCROOT)/llama-libs/libcpp-httplib.a", "$(SRCROOT)/llama-libs/libggml.a", "$(SRCROOT)/llama-libs/libggml-base.a", "$(SRCROOT)/llama-libs/libggml-cpu.a", "-framework", "Accelerate"]
     info:
       path: SiInterpreter/Info.plist
       properties:
