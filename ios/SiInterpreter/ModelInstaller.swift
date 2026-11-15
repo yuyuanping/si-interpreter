@@ -36,7 +36,7 @@ final class ModelInstaller: ObservableObject {
         let dir = store.installDir(bundle.id)
         var lastError: String?
 
-        for base in Bundles.bases {
+        for base in bundle.bases ?? Bundles.bases {
             var ok = true
             for (i, fs) in bundle.files.enumerated() {
                 if isCancelled { return false }

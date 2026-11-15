@@ -18,6 +18,9 @@ struct Bundle {
     let path: String
     let files: [FileSpec]
     let note: String
+    /// override of Bundles.bases for bundles the HF mirrors cannot serve: hf-mirror
+    /// answers 401 for snakers4/silero-vad, so that one must come from GitHub raw
+    var bases: [String]? = nil
 
     var totalMb: Int64 { files.map(\.minBytes).reduce(0, +) / 1_000_000 }
 
@@ -66,7 +69,8 @@ enum Bundles {
         kind: .vad,
         path: "snakers4/silero-vad/raw/refs/tags/v5.0/files",
         files: [FileSpec(remote: "silero_vad.onnx", local: "silero_vad.onnx", minBytes: 2_000_000)],
-        note: "约 2.2 MB · MIT 协议 · 拦截环境噪音，只把人声喂给识别"
+        note: "约 2.2 MB · MIT 协议 · 拦截环境噪音，只把人声喂给识别",
+        bases: ["https://github.com"],
     )
 
     /// SenseVoice-Small offline (~228 MB int8). The accuracy path: decodes each

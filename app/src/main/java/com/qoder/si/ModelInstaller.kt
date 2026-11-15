@@ -49,7 +49,7 @@ class ModelInstaller(private val context: Context) {
         val dir = store.installDir(bundle.id)
         var lastError: String? = null
 
-        for (base in Bundles.bases) {
+        for (base in bundle.bases ?: Bundles.bases) {
             var ok = true
             bundle.files.forEachIndexed { i, fs ->
                 if (cancelled) return@withContext false

@@ -16,6 +16,9 @@ data class Bundle(
     val path: String,
     val files: List<FileSpec>,
     val note: String = "",
+    /** override of Bundles.bases for bundles the HF mirrors cannot serve: hf-mirror
+     *  answers 401 for snakers4/silero-vad, so that one must come from GitHub raw */
+    val bases: List<String>? = null,
 ) {
     enum class Kind { ASR, VAD, MT, TTS }
     val totalMb: Long get() = files.sumOf { it.minBytes } / 1_000_000
@@ -71,6 +74,7 @@ object Bundles {
             FileSpec("silero_vad.onnx", "silero_vad.onnx", 2_000_000),
         ),
         note = "约 2.2 MB · MIT 协议 · 拦截环境噪音，只把人声喂给识别",
+        bases = listOf("https://github.com"),
     )
 
     /**
