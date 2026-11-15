@@ -148,7 +148,7 @@ private fun App(
                 engine != null -> LivePanel(engine!!, activity)
                 svcRunning -> LoadingPanel()
                 installed.isEmpty() -> ModelSetup(installer, dl) { rescanKey++ }
-                else -> IdlePanel(installed, store, config, activity)
+                else -> IdlePanel(installed, store, config, installer, dl, activity) { rescanKey++ }
             }
             Spacer(Modifier.height(16.dp))
         }
@@ -216,14 +216,25 @@ private fun IdlePanel(
     installed: List<String>,
     store: ModelStore,
     config: PipelineConfig,
+    installer: ModelInstaller,
+    dl: DownloadState,
     activity: MainActivity,
+    onRescan: () -> Unit,
 ) {
     var src by remember { mutableStateOf(config.sourceLang) }
     var tgt by remember { mutableStateOf(config.targetLang) }
     var cut by remember { mutableStateOf(config.cutSilenceSec) }
     var speak by remember { mutableStateOf(config.speakTranslation) }
+    var pickMt by remember { mutableStateOf(config.mtBundleId) }
 
-    InstalledList(store)
+    // the SAME resolution rule ModelStore.pathsMt applies: the picked bundle wins only
+    // when installed, otherwise the first installed MT bundle in A/B order
+    val installedMt = Bundles.all.filter {
+        it.kind == com.qoder.si.Bundle.Kind.MT && installed.contains(it.id)
+    }
+    val chosenMt = installedMt.firstOrNull { it.id == pickMt } ?: installedMt.firstOrNull()
+
+    ModelManager(installed, store, installer, dl, onRescan)
     Spacer(Modifier.height(14.dp))
 
     Section("方向")
@@ -234,17 +245,33 @@ private fun IdlePanel(
         }
         Text("每句按实测语言自动定向：说中文译成英文，说英文译成中文。上方选择仅在无法判定时生效。",
             color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-        val mtEngine = when {
-            installed.contains(Bundles.mtGemma4E2B.id) -> "谷歌 Gemma 4 E2B"
-            installed.contains(Bundles.mtHymt2.id) -> "腾讯混元 Hy-MT2"
-            else -> null
-        }
+        val mtEngine = chosenMt?.label
         Text(
             if (mtEngine != null) "翻译引擎已就绪：$mtEngine，纯本地推理。"
             else "安装下方翻译模型后即可离线翻译；未安装时译文处显示占位标记。",
             color = if (mtEngine != null) Ok else Warn,
             fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp),
         )
+    }
+    Spacer(Modifier.height(14.dp))
+
+    Section("翻译模型")
+    Card {
+        if (installedMt.isEmpty()) {
+            Text("未安装翻译模型。装好后可在此选择用哪个模型翻译。",
+                color = Warn, fontSize = 12.sp)
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                LangChip("自动", pickMt == null) { pickMt = null; config.mtBundleId = null }
+                installedMt.forEach { b ->
+                    LangChip(if (b.id == Bundles.mtGemma4E2B.id) "Gemma" else "混元", pickMt == b.id) {
+                        pickMt = b.id; config.mtBundleId = b.id
+                    }
+                }
+            }
+            Text("自动 = 优先谷歌 Gemma 4，未装则用混元 Hy-MT2。切换在下次开始时生效。",
+                color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+        }
     }
     Spacer(Modifier.height(14.dp))
 
@@ -391,17 +418,60 @@ private fun LoadingPanel() {
     }
 }
 
+/**
+ * Every bundle in the catalogue with its state and one action each: installed -> 删除
+ * (re-downloadable, so no confirm), missing -> 下载 through the in-app installer, and a
+ * live progress row while that bundle's files are fetching. This is what makes the
+ * 翻译模型 switch real: the alternative GGUF is installable without adb.
+ */
 @Composable
-private fun InstalledList(store: ModelStore) {
-    Section("已安装")
+private fun ModelManager(
+    installed: List<String>,
+    store: ModelStore,
+    installer: ModelInstaller,
+    dl: DownloadState,
+    onRescan: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+
+    Section("模型")
     Card {
-        val ids = store.installed()
-        if (ids.isEmpty()) {
-            Text("（无）", color = Faint, fontSize = 13.sp)
-        } else ids.forEach { id ->
-            val label = Bundles.byId(id)?.label ?: id
-            val where = if (store.resolveDir(id)?.path?.contains("Android") == true) "adb" else "本机"
-            Text("✓  $label   [$where]", color = Ok, fontSize = 13.sp)
+        Bundles.all.forEach { b ->
+            val here = installed.contains(b.id)
+            val busy = dl.active && dl.label == b.label
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    val where = if (store.resolveDir(b.id)?.path?.contains("Android") == true) "adb" else "本机"
+                    Text(
+                        (if (here) "✓  ${b.label}  [$where]" else "＋  ${b.label}"),
+                        color = if (here) Ok else Dim, fontSize = 13.sp,
+                    )
+                    if (!here) Text(b.note, color = Faint, fontSize = 11.sp)
+                    if (busy) {
+                        Progress(dl.done, dl.total)
+                        Text("${mb(dl.done)} / ${mb(dl.total)} MB    ${speed(dl.bytesPerSec)}",
+                            color = Faint, fontSize = 11.sp)
+                    }
+                }
+                when {
+                    busy -> OutlinedButton(onClick = { installer.cancel() }) { Text("取消") }
+                    here -> OutlinedButton(onClick = {
+                        scope.launch { installer.delete(b); onRescan() }
+                    }) { Text("删除") }
+                    else -> OutlinedButton(onClick = {
+                        scope.launch { installer.install(b); onRescan() }
+                    }) { Text("下载") }
+                }
+            }
+        }
+        if (!dl.active && dl.message.isNotEmpty()) {
+            Text(dl.message,
+                color = if (dl.message.contains("失败") || dl.message.contains("取消")) Warn else Ok,
+                fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         }
     }
 }

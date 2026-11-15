@@ -78,10 +78,15 @@ class ModelStore(context: Context) {
     }
 
     /** Offline translation GGUF, or null when not installed (placeholder marks turns).
-     *  A/B order: Gemma 4 when installed wins; remove its directory to fall back to Hy-MT2
-     *  without touching the other install. */
-    fun pathsMt(): MtPaths? {
-        for (id in listOf(Bundles.mtGemma4E2B.id, Bundles.mtHymt2.id)) {
+     *  [preferred] is the user's pick from the idle panel; it is honoured only when that
+     *  bundle is actually installed — otherwise the A/B default order applies (Gemma 4
+     *  first), so a deleted pick never bricks translation. null preferred = auto. */
+    fun pathsMt(preferred: String? = null): MtPaths? {
+        val mtIds = listOf(Bundles.mtGemma4E2B.id, Bundles.mtHymt2.id)
+        val order = if (preferred != null && mtIds.contains(preferred))
+            listOf(preferred) + mtIds.filter { it != preferred }
+        else mtIds
+        for (id in order) {
             val d = resolveDir(id) ?: continue
             val p = MtPaths(File(d, "model.gguf").absolutePath)
             if (p.exists()) return p

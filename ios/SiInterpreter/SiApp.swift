@@ -48,7 +48,7 @@ final class Session: ObservableObject {
         // real on-device MT when a GGUF is present; the placeholder only marks turns
         // otherwise — it is never a silent fallback that pretends to translate
         let translator: Translator
-        if let mt = store.pathsMt() {
+        if let mt = store.pathsMt(preferred: config.mtBundleId) {
             translator = LlamaTranslator(paths: mt)
         } else {
             translator = PlaceholderTranslator()

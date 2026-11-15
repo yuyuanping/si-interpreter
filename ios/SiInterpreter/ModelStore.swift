@@ -77,10 +77,15 @@ final class ModelStore {
     }
 
     /// Offline translation GGUF, or nil when not installed (placeholder marks turns).
-    /// A/B order: Gemma 4 when installed wins; remove its directory to fall back to
-    /// Hy-MT2 without touching the other install.
-    func pathsMt() -> MtPaths? {
-        for id in [Bundles.mtGemma4E2B.id, Bundles.mtHymt2.id] {
+    /// `preferred` is the user's pick from the idle panel; it is honoured only when that
+    /// bundle is actually installed — otherwise the A/B default order applies (Gemma 4
+    /// first), so a deleted pick never bricks translation. nil preferred = auto.
+    func pathsMt(preferred: String? = nil) -> MtPaths? {
+        let ids = [Bundles.mtGemma4E2B.id, Bundles.mtHymt2.id]
+        let order = (preferred != nil && ids.contains(preferred!))
+            ? [preferred!] + ids.filter { $0 != preferred }
+            : ids
+        for id in order {
             guard let d = resolveDir(id) else { continue }
             let p = MtPaths(model: d.appendingPathComponent("model.gguf").path)
             if p.exists { return p }

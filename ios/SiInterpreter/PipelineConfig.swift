@@ -31,4 +31,12 @@ final class PipelineConfig {
         get { d.object(forKey: "cutSilenceSec") as? Float ?? 1.0 }
         set { d.set(newValue, forKey: "cutSilenceSec") }
     }
+
+    /// preferred MT bundle id, or nil for the automatic A/B order (Gemma 4 first).
+    /// Honoured only when that bundle is actually installed; otherwise the auto order
+    /// applies, so a deleted pick never bricks translation.
+    var mtBundleId: String? {
+        get { d.string(forKey: "mtBundle") }
+        set { d.set(newValue, forKey: "mtBundle") }
+    }
 }

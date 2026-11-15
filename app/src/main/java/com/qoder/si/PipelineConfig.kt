@@ -25,4 +25,10 @@ class PipelineConfig(context: Context) {
      *  speakers off mid-sentence on any thinking pause; the idle panel exposes presets. */
     var cutSilenceSec: Float = sp.getFloat("cutSilenceSec", 1.0f)
         set(v) { field = v; sp.edit().putFloat("cutSilenceSec", v).apply() }
+
+    /** preferred MT bundle id, or null for the automatic A/B order (Gemma 4 first).
+     *  Honoured only when that bundle is actually installed; otherwise the auto order
+     *  applies, so a deleted pick never bricks translation. */
+    var mtBundleId: String? = sp.getString("mtBundle", null)
+        set(v) { field = v; sp.edit().putString("mtBundle", v).apply() }
 }

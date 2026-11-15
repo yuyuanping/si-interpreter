@@ -106,7 +106,7 @@ class InterpreterService : android.app.Service() {
             }
             val vadPath = store.vadPath()
             val svPath = store.pathsSenseVoice()
-            val mtPath = store.pathsMt()
+            val mtPath = store.pathsMt(config.mtBundleId)
             // real on-device MT when the 1.1 GB GGUF is present; the placeholder only marks
             // turns otherwise — it is never a silent fallback that pretends to translate
             val translator: Translator = if (mtPath != null) LlamaTranslator(mtPath) else PlaceholderTranslator()
