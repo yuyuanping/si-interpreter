@@ -49,9 +49,9 @@ final class ModelInstaller: ObservableObject {
                 if let attr = try? FileManager.default.attributesOfItem(atPath: final.path),
                    (attr[.size] as? Int64 ?? 0) >= fs.minBytes { continue }
 
-                if await fetch(bundle.urlFor(base), fs, final, dir) == false {
+                if let err = await fetch(bundle.fileUrl(base, fs), fs, final, dir) {
                     ok = false
-                    lastError = "下载失败: \(fs.local)"
+                    lastError = err
                     break
                 }
             }
@@ -70,7 +70,8 @@ final class ModelInstaller: ObservableObject {
 
     private var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return cancelled }
 
-    private func fetch(_ urlStr: String, _ fs: FileSpec, _ final: URL, _ dir: URL) async -> Bool {
+    /// nil on success, otherwise the error message to surface in the UI
+    private func fetch(_ urlStr: String, _ fs: FileSpec, _ final: URL, _ dir: URL) async -> String? {
         let part = dir.appendingPathComponent(fs.local + ".part")
         var start: Int64 = 0
         if let attr = try? FileManager.default.attributesOfItem(atPath: part.path) {
@@ -79,7 +80,8 @@ final class ModelInstaller: ObservableObject {
         // if the server (or a captive network) returned something tiny, do not trust resume
         if start >= fs.minBytes { try? FileManager.default.removeItem(at: part); start = 0 }
 
-        var request = URLRequest(url: URL(string: urlStr)!)
+        guard let url = URL(string: urlStr) else { return "URL 无效: \(urlStr)" }
+        var request = URLRequest(url: url)
         request.timeoutInterval = 30
         if start > 0 { request.setValue("bytes=\(start)-", forHTTPHeaderField: "Range") }
 
@@ -87,16 +89,20 @@ final class ModelInstaller: ObservableObject {
             let (bytes, response) = try await URLSession.shared.bytes(for: request)
             let http = response as? HTTPURLResponse
             guard let code = http?.statusCode, (200...299).contains(code) else {
-                return false
+                return "HTTP \((http?.statusCode ?? -1)): \(fs.local)"
             }
             // 200 means the server ignored Range: restart from zero rather than append
             // onto an existing partial file, which would silently corrupt the model
-            var append = (code == 206 && start > 0)
-            if !append { start = 0; append = false }
+            let append = (code == 206 && start > 0)
+            if !append { start = 0 }
             let contentLen = Int64(http?.expectedContentLength ?? -1)
             let total = contentLen >= 0 ? (append ? start + contentLen : contentLen) : -1
 
-            FileManager.default.createFile(atPath: part.path, contents: nil)
+            // only create a fresh .part when NOT resuming — createFile truncates the
+            // existing partial, which would turn every resume into a corrupt file
+            if !append {
+                FileManager.default.createFile(atPath: part.path, contents: nil)
+            }
             let fh = try FileHandle(forWritingTo: part)
             defer { try? fh.close() }
             if append { try fh.seek(toOffset: UInt64(start)) } else { try? fh.truncate(atOffset: 0) }
@@ -117,7 +123,7 @@ final class ModelInstaller: ObservableObject {
             }
 
             for try await b in bytes {
-                if isCancelled { return false }
+                if isCancelled { return "已取消" }
                 buf.append(b)
                 if buf.count >= 262_144 {
                     try flushBuf()
@@ -142,12 +148,14 @@ final class ModelInstaller: ObservableObject {
                (attr[.size] as? Int64 ?? 0) >= fs.minBytes {
                 try? FileManager.default.removeItem(at: final)
                 try FileManager.default.moveItem(at: part, to: final)
-                return true
+                return nil
             }
-            return false
+            return "文件不完整: \(fs.local)"
         } catch {
-            if isCancelled { return false }
-            return false
+            if isCancelled { return "已取消" }
+            // the localizedDescription is the useful one on iPhone (e.g. the China-region
+            // "无线局域网与蜂窝网络" permission rejection reads as a plain offline error)
+            return "\(fs.local): \(error.localizedDescription)"
         }
     }
 

@@ -25,6 +25,14 @@ struct Bundle {
         base.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/" +
             path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
+
+    /// URL of one file in the bundle. The installer used to pass urlFor(base) alone —
+    /// the filename never landed on the URL, so every multi-file bundle fetched the
+    /// repo's directory page (HTML) and failed its size check. Silero only ever worked
+    /// because its path happened to contain the name.
+    func fileUrl(_ base: String, _ fs: FileSpec) -> String {
+        urlFor(base).trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/" + fs.remote
+    }
 }
 
 enum Bundles {
@@ -56,7 +64,7 @@ enum Bundles {
         id: "vad-silero-v5",
         label: "语音活动检测 (Silero v5)",
         kind: .vad,
-        path: "snakers4/silero-vad/raw/refs/tags/v5.0/files/silero_vad.onnx",
+        path: "snakers4/silero-vad/raw/refs/tags/v5.0/files",
         files: [FileSpec(remote: "silero_vad.onnx", local: "silero_vad.onnx", minBytes: 2_000_000)],
         note: "约 2.2 MB · MIT 协议 · 拦截环境噪音，只把人声喂给识别"
     )

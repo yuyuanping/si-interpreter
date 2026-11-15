@@ -59,7 +59,7 @@ class ModelInstaller(private val context: Context) {
                 )
                 val final = File(dir, fs.local)
                 if (final.isFile && final.length() >= fs.minBytes) return@forEachIndexed
-                if (!fetch(bundle.urlFor(base), fs, final, dir)) {
+                if (!fetch(bundle.fileUrl(base, fs), fs, final, dir)) {
                     ok = false
                     lastError = "下载失败: ${fs.local}"
                     return@forEachIndexed

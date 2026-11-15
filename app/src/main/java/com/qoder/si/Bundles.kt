@@ -21,6 +21,14 @@ data class Bundle(
     val totalMb: Long get() = files.sumOf { it.minBytes } / 1_000_000
 
     fun urlFor(base: String) = "${base.trimEnd('/')}/${path.trimStart('/')}"
+
+    /**
+     * URL of one file in the bundle: urlFor(base) + "/" + remote. The installer used
+     * to pass urlFor(base) alone — the filename never landed on the URL, so every
+     * multi-file bundle fetched the repo's directory page (HTML) and failed its size
+     * check. Silero only ever worked because its path happened to contain the name.
+     */
+    fun fileUrl(base: String, fs: FileSpec) = "${urlFor(base).trimEnd('/')}/${fs.remote}"
 }
 
 object Bundles {
@@ -58,7 +66,7 @@ object Bundles {
         label = "语音活动检测 (Silero v5)",
         kind = Bundle.Kind.VAD,
         // snakers4/silero-vad GitHub release is a stable CDN copy that does not need HF auth
-        path = "snakers4/silero-vad/raw/refs/tags/v5.0/files/silero_vad.onnx",
+        path = "snakers4/silero-vad/raw/refs/tags/v5.0/files",
         files = listOf(
             FileSpec("silero_vad.onnx", "silero_vad.onnx", 2_000_000),
         ),
