@@ -23,7 +23,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -161,52 +163,54 @@ private fun ModelSetup(installer: ModelInstaller, dl: DownloadState, onRescan: (
     val clipboard = LocalClipboardManager.current
     val bundle = Bundles.asrZipformerBilingual
 
-    Section("第一步 · 安装语音模型")
-    Card {
-        Text(bundle.label, color = Fg, fontWeight = FontWeight.Bold)
-        Text(bundle.note, color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-        Text("只有这一步需要网络。装完后飞行模式可正常使用。",
-            color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-        Spacer(Modifier.height(12.dp))
-
-        if (dl.active) {
-            Text("${dl.fileIndex}/${dl.fileCount}  ${dl.fileName}", color = Ok, fontSize = 12.sp)
-            Progress(dl.done, dl.total)
-            Text("${mb(dl.done)} / ${mb(dl.total)} MB    ${speed(dl.bytesPerSec)}",
-                color = Dim, fontSize = 12.sp)
-            OutlinedButton(
-                onClick = { installer.cancel() },
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            ) { Text("取消") }
-        } else {
-            Button(
-                onClick = { scope.launch { installer.install(bundle) } },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("下载模型 ${bundle.totalMb} MB") }
-            if (dl.message.isNotEmpty()) {
-                Text(dl.message, color = Warn, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Section("第一步 · 安装语音模型")
+        Card {
+            Text(bundle.label, color = Fg, fontWeight = FontWeight.Bold)
+            Text(bundle.note, color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+            Text("只有这一步需要网络。装完后飞行模式可正常使用。",
+                color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+            Spacer(Modifier.height(12.dp))
+    
+            if (dl.active) {
+                Text("${dl.fileIndex}/${dl.fileCount}  ${dl.fileName}", color = Ok, fontSize = 12.sp)
+                Progress(dl.done, dl.total)
+                Text("${mb(dl.done)} / ${mb(dl.total)} MB    ${speed(dl.bytesPerSec)}",
+                    color = Dim, fontSize = 12.sp)
+                OutlinedButton(
+                    onClick = { installer.cancel() },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                ) { Text("取消") }
+            } else {
+                Button(
+                    onClick = { scope.launch { installer.install(bundle) } },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("下载模型 ${bundle.totalMb} MB") }
+                if (dl.message.isNotEmpty()) {
+                    Text(dl.message, color = Warn, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                }
             }
         }
-    }
-
-    Spacer(Modifier.height(12.dp))
-    Section("完全不走网：用数据线推模型")
-    Card {
-        Text("电脑上下载好，adb push 进手机，App 直接识别。", color = Dim, fontSize = 12.sp)
-        Spacer(Modifier.height(6.dp))
-        Text("目标目录（点击复制）", color = Faint, fontSize = 11.sp)
-        val path = installer.adbPath(bundle)
-        Text(path, color = Live, fontSize = 11.sp,
-            modifier = Modifier.padding(top = 2.dp, bottom = 6.dp).clickable {
-                clipboard.setText(AnnotatedString(path))
-            })
-        Text("文件名必须改成", color = Faint, fontSize = 11.sp)
-        bundle.files.forEach {
-            Text("  ${it.remote}  →  ${it.local}", color = Dim, fontSize = 11.sp)
-        }
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onRescan, modifier = Modifier.fillMaxWidth()) {
-            Text("推完后重新扫描")
+    
+        Spacer(Modifier.height(12.dp))
+        Section("完全不走网：用数据线推模型")
+        Card {
+            Text("电脑上下载好，adb push 进手机，App 直接识别。", color = Dim, fontSize = 12.sp)
+            Spacer(Modifier.height(6.dp))
+            Text("目标目录（点击复制）", color = Faint, fontSize = 11.sp)
+            val path = installer.adbPath(bundle)
+            Text(path, color = Live, fontSize = 11.sp,
+                modifier = Modifier.padding(top = 2.dp, bottom = 6.dp).clickable {
+                    clipboard.setText(AnnotatedString(path))
+                })
+            Text("文件名必须改成", color = Faint, fontSize = 11.sp)
+            bundle.files.forEach {
+                Text("  ${it.remote}  →  ${it.local}", color = Dim, fontSize = 11.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onRescan, modifier = Modifier.fillMaxWidth()) {
+                Text("推完后重新扫描")
+            }
         }
     }
 }
@@ -234,79 +238,83 @@ private fun IdlePanel(
     }
     val chosenMt = installedMt.firstOrNull { it.id == pickMt } ?: installedMt.firstOrNull()
 
-    ModelManager(installed, store, installer, dl, onRescan)
-    Spacer(Modifier.height(14.dp))
-
-    Section("方向")
-    Card {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            LangChip("英 → 中", src == "en" && tgt == "zh") { src = "en"; tgt = "zh" }
-            LangChip("中 → 英", src == "zh" && tgt == "en") { src = "zh"; tgt = "en" }
-        }
-        Text("每句按实测语言自动定向：说中文译成英文，说英文译成中文。上方选择仅在无法判定时生效。",
-            color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-        val mtEngine = chosenMt?.label
-        Text(
-            if (mtEngine != null) "翻译引擎已就绪：$mtEngine，纯本地推理。"
-            else "安装下方翻译模型后即可离线翻译；未安装时译文处显示占位标记。",
-            color = if (mtEngine != null) Ok else Warn,
-            fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp),
-        )
-    }
-    Spacer(Modifier.height(14.dp))
-
-    Section("翻译模型")
-    Card {
-        if (installedMt.isEmpty()) {
-            Text("未安装翻译模型。装好后可在此选择用哪个模型翻译。",
-                color = Warn, fontSize = 12.sp)
-        } else {
+    // five model rows plus four settings cards overflow the screen: without a
+    // scroll the lower sections are unreachable
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        ModelManager(installed, store, installer, dl, onRescan)
+        Spacer(Modifier.height(14.dp))
+    
+        Section("方向")
+        Card {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                LangChip("自动", pickMt == null) { pickMt = null; config.mtBundleId = null }
-                installedMt.forEach { b ->
-                    LangChip(if (b.id == Bundles.mtGemma4E2B.id) "Gemma" else "混元", pickMt == b.id) {
-                        pickMt = b.id; config.mtBundleId = b.id
+                LangChip("英 → 中", src == "en" && tgt == "zh") { src = "en"; tgt = "zh" }
+                LangChip("中 → 英", src == "zh" && tgt == "en") { src = "zh"; tgt = "en" }
+            }
+            Text("每句按实测语言自动定向：说中文译成英文，说英文译成中文。上方选择仅在无法判定时生效。",
+                color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+            val mtEngine = chosenMt?.label
+            Text(
+                if (mtEngine != null) "翻译引擎已就绪：$mtEngine，纯本地推理。"
+                else "安装下方翻译模型后即可离线翻译；未安装时译文处显示占位标记。",
+                color = if (mtEngine != null) Ok else Warn,
+                fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+    
+        Section("翻译模型")
+        Card {
+            if (installedMt.isEmpty()) {
+                Text("未安装翻译模型。装好后可在此选择用哪个模型翻译。",
+                    color = Warn, fontSize = 12.sp)
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    LangChip("自动", pickMt == null) { pickMt = null; config.mtBundleId = null }
+                    installedMt.forEach { b ->
+                        LangChip(if (b.id == Bundles.mtGemma4E2B.id) "Gemma" else "混元", pickMt == b.id) {
+                            pickMt = b.id; config.mtBundleId = b.id
+                        }
                     }
                 }
+                Text("自动 = 优先谷歌 Gemma 4，未装则用混元 Hy-MT2。切换在下次开始时生效。",
+                    color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
             }
-            Text("自动 = 优先谷歌 Gemma 4，未装则用混元 Hy-MT2。切换在下次开始时生效。",
+        }
+        Spacer(Modifier.height(14.dp))
+    
+        Section("断句停顿")
+        Card {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                listOf(0.5f, 1.0f, 1.5f, 2.5f).forEach { v ->
+                    LangChip("${v}s", cut == v) { cut = v; config.cutSilenceSec = v }
+                }
+            }
+            Text("说话停顿超过该时长就按句尾切句并翻译。句子被切得太碎就调大，译文会相应出得稍慢。",
                 color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
         }
-    }
-    Spacer(Modifier.height(14.dp))
-
-    Section("断句停顿")
-    Card {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            listOf(0.5f, 1.0f, 1.5f, 2.5f).forEach { v ->
-                LangChip("${v}s", cut == v) { cut = v; config.cutSilenceSec = v }
+        Spacer(Modifier.height(14.dp))
+    
+        Section("语音播报")
+        Card {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                LangChip("开", speak) { speak = true; config.speakTranslation = true }
+                LangChip("关", !speak) { speak = false; config.speakTranslation = false }
             }
+            Text("译文完成后用系统语音朗读，零下载。播报期间暂停聆听，避免把喇叭里的声音识别进来；点任意一条译文可重听。",
+                color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
         }
-        Text("说话停顿超过该时长就按句尾切句并翻译。句子被切得太碎就调大，译文会相应出得稍慢。",
-            color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+        Spacer(Modifier.height(14.dp))
+    
+        Button(
+            onClick = {
+                config.sourceLang = src
+                config.targetLang = tgt
+                activity.startInterpretation()
+            },
+            enabled = src != tgt && installed.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+        ) { Text("开始", fontSize = 18.sp) }
     }
-    Spacer(Modifier.height(14.dp))
-
-    Section("语音播报")
-    Card {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            LangChip("开", speak) { speak = true; config.speakTranslation = true }
-            LangChip("关", !speak) { speak = false; config.speakTranslation = false }
-        }
-        Text("译文完成后用系统语音朗读，零下载。播报期间暂停聆听，避免把喇叭里的声音识别进来；点任意一条译文可重听。",
-            color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-    }
-    Spacer(Modifier.height(14.dp))
-
-    Button(
-        onClick = {
-            config.sourceLang = src
-            config.targetLang = tgt
-            activity.startInterpretation()
-        },
-        enabled = src != tgt && installed.isNotEmpty(),
-        modifier = Modifier.fillMaxWidth().height(54.dp),
-    ) { Text("开始", fontSize = 18.sp) }
 }
 
 @Composable
