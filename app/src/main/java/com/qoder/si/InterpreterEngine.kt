@@ -69,6 +69,15 @@ class InterpreterEngine(
     private var gate: VadGate? = null
 
     /**
+     * System-TTS playback of finished translations, and tap-to-replay of history rows.
+     * Always built at start() so replay works regardless of the toggle; [PipelineConfig]
+     * speakTranslation only governs AUTO-speaking. While [TtsPlayer.muted] is true the
+     * capture loop drops hops: the speaker output reaches the mic, and transcribing our
+     * own voice is the exact failure mode the VAD exists to prevent.
+     */
+    private var tts: TtsPlayer? = null
+
+    /**
      * Offline refinement engine (SenseVoice). Decodes each completed VAD segment whole —
      * this is what the user sees as the final transcript. Brought up LAZILY in its own
      * coroutine: session init for a 228 MB int8 model can take a while on flash+CPU, and
@@ -136,6 +145,7 @@ class InterpreterEngine(
                 // a tiny (~2 MB) ONNX model but its native ctor still touches disk+ONNXRuntime,
                 // so keep it off the main thread for the same reason as the 175 MB encoder.
                 gate = VadGate(vadPath, asr.sampleRate, config.cutSilenceSec)
+                tts = TtsPlayer(context)
             }
             Log.i(TAG, "started gate.enabled=${gate?.enabled == true}")
             _state.value = EngineState.Running
@@ -179,6 +189,8 @@ class InterpreterEngine(
     fun stop() {
         scope?.cancel()
         scope = null
+        tts?.shutdown()
+        tts = null
         gate?.release()
         gate = null
         offline?.release()
@@ -237,6 +249,11 @@ class InterpreterEngine(
             while (currentCoroutineContext().isActive) {
                 val n = rec.read(pcm, 0, hop)
                 if (n <= 0) continue
+                // TTS playback mutes the pipeline: the speaker output reaches the mic
+                // and transcribing our own voice is the failure mode the VAD exists to
+                // prevent. Dropped hops are gone — speech over the playback is lost,
+                // same as a human interpreter talking over the translation.
+                if (tts?.muted == true) continue
                 val frame = if (n == hop) f else f.copyOf(n)
                 for (i in 0 until n) f[i] = pcm[i] / 32768f
                 val level = rms(f, n)
@@ -426,8 +443,15 @@ class InterpreterEngine(
             val done = Utterance(id, text, out, src, tgt, pending = false, latencyMs = ms)
             _history.value = _history.value.map { if (it.id == id) done else it }
             _stats.update { it.copy(translateMs = ms, utterances = id) }
+            // auto-speak follows the toggle; tapping a history row replays regardless
+            if (config.speakTranslation) tts?.speak(out, tgt)
             onFinished(done)
         }
+    }
+
+    /** speak one already-translated utterance again (tap on a history row) */
+    fun replay(u: Utterance) {
+        tts?.speak(u.translated, u.target)
     }
 
     fun clear() {

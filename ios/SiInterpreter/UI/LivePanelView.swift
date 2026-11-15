@@ -67,7 +67,7 @@ struct LivePanelView: View {
             ScrollView {
                 LazyVStack(spacing: 8) {
                     ForEach(engine.history) { u in
-                        UtteranceRow(u: u).id(u.id)
+                        UtteranceRow(u: u, onTap: { engine.replay(u) }).id(u.id)
                     }
                 }
             }

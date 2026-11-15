@@ -35,6 +35,13 @@ final class InterpreterEngine: ObservableObject {
     private let config: PipelineConfig
     private let asr = AsrEngine()
     private let capture = AudioCapture()
+
+    /// System-TTS playback of finished translations, and tap-to-replay of history rows.
+    /// Always built with the engine so replay works regardless of the toggle;
+    /// config.speakTranslation only governs AUTO-speaking. While TtsSpeaker.muted is
+    /// true the hop worker drops hops: the speaker output reaches the mic, and
+    /// transcribing our own voice is the failure mode the VAD exists to prevent.
+    private let speaker = TtsSpeaker()
     private var translator: Translator
     private var asrPaths: ModelPaths?
     private var vadPath: VadPath?
@@ -177,6 +184,7 @@ final class InterpreterEngine: ObservableObject {
             self.hopTimer?.cancel()
             self.hopTimer = nil
             self.capture.stop()
+            self.speaker.stopSpeaking()
             self.gate?.release()
             self.gate = nil
             self.asr.release()
@@ -210,6 +218,11 @@ final class InterpreterEngine: ObservableObject {
     private func hop() {
         let hopSamples = 16000 * config.hopMs / 1000        // 100 ms -> 1600 samples
         guard let frame = capture.pipe.take(hopSamples) else { return }
+
+        // TTS playback mutes the pipeline: the speaker output reaches the mic and
+        // transcribing our own voice is the failure mode the VAD exists to prevent.
+        // Dropped hops are gone — speech over the playback is lost.
+        if speaker.muted { return }
 
         let t0 = Date()
         let level = rms(frame)
@@ -353,8 +366,18 @@ final class InterpreterEngine: ObservableObject {
                 self.stats.translateMs = ms
                 self.stats.utterances = id
             }
+            // re-arm FIRST so the next turn decodes (CPU) while playback runs (audio);
+            // auto-speak follows the toggle, tapping a history row replays regardless
             self.translateLoop()
+            if self.config.speakTranslation {
+                self.speaker.speak(out, lang: tgt)
+            }
         }
+    }
+
+    /// speak one already-translated utterance again (tap on a history row)
+    func replay(_ u: Utterance) {
+        speaker.speak(u.translated, lang: u.target)
     }
 
     /// SenseVoice reports the lang as the raw first token, e.g. "<|zh|>"; map to a code

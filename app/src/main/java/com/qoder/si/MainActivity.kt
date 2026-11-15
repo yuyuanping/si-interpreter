@@ -221,6 +221,7 @@ private fun IdlePanel(
     var src by remember { mutableStateOf(config.sourceLang) }
     var tgt by remember { mutableStateOf(config.targetLang) }
     var cut by remember { mutableStateOf(config.cutSilenceSec) }
+    var speak by remember { mutableStateOf(config.speakTranslation) }
 
     InstalledList(store)
     Spacer(Modifier.height(14.dp))
@@ -255,6 +256,17 @@ private fun IdlePanel(
             }
         }
         Text("说话停顿超过该时长就按句尾切句并翻译。句子被切得太碎就调大，译文会相应出得稍慢。",
+            color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+    }
+    Spacer(Modifier.height(14.dp))
+
+    Section("语音播报")
+    Card {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            LangChip("开", speak) { speak = true; config.speakTranslation = true }
+            LangChip("关", !speak) { speak = false; config.speakTranslation = false }
+        }
+        Text("译文完成后用系统语音朗读，零下载。播报期间暂停聆听，避免把喇叭里的声音识别进来；点任意一条译文可重听。",
             color = Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
     }
     Spacer(Modifier.height(14.dp))
@@ -353,7 +365,7 @@ private fun LivePanel(engine: InterpreterEngine, activity: MainActivity) {
         Spacer(Modifier.height(10.dp))
 
         LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
-            items(history, key = { it.id }) { UtteranceRow(it) }
+            items(history, key = { it.id }) { UtteranceRow(it) { engine.replay(it) } }
         }
 
         Spacer(Modifier.height(8.dp))
@@ -395,10 +407,11 @@ private fun InstalledList(store: ModelStore) {
 }
 
 @Composable
-private fun UtteranceRow(u: Utterance) {
+private fun UtteranceRow(u: Utterance, onReplay: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().padding(vertical = 5.dp)
             .background(Cell, RoundedCornerShape(10.dp)).padding(12.dp)
+            .clickable(onClick = onReplay)
     ) {
         Text(u.sourceText, color = Dim, fontSize = 14.sp)
         Spacer(Modifier.height(4.dp))

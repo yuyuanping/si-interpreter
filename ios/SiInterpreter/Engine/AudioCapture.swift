@@ -47,8 +47,11 @@ final class AudioCapture {
         do {
             // .measurement skips the aggressive voice-processing gain that pumps up
             // room noise between sentences — the iOS twin of the Android
-            // VOICE_RECOGNITION source choice
-            try session.setCategory(.record, mode: .measurement)
+            // VOICE_RECOGNITION source choice. playAndRecord + defaultToSpeaker so the
+            // TTS player is heard over the speaker rather than the earpiece; the
+            // speaker's own echo is handled by muting the hop worker during playback.
+            try session.setCategory(.playAndRecord, mode: .measurement,
+                                    options: [.defaultToSpeaker])
             try session.setPreferredSampleRate(sampleRate)
             try session.setPreferredIOBufferDuration(Double(hopMs) / 1000.0)
             try session.setActive(true)

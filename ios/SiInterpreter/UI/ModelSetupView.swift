@@ -93,12 +93,16 @@ struct IdlePanelView: View {
     @State private var src = "en"
     @State private var tgt = "zh"
     @State private var cut: Float = 1.0
+    @State private var speak = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 installedList
-                    .onAppear { cut = session.config.cutSilenceSec }
+                    .onAppear {
+                        cut = session.config.cutSilenceSec
+                        speak = session.config.speakTranslation
+                    }
                 Text("方向").sectionStyle()
                 Card {
                     HStack(spacing: 10) {
@@ -136,6 +140,22 @@ struct IdlePanelView: View {
                         }
                     }
                     Text("说话停顿超过该时长就按句尾切句并翻译。句子被切得太碎就调大，译文会相应出得稍慢。")
+                        .font(.system(size: 12))
+                        .foregroundColor(Theme.dim)
+                        .padding(.top, 8)
+                }
+
+                Text("语音播报").sectionStyle()
+                Card {
+                    HStack(spacing: 10) {
+                        LangChip(text: "开", selected: speak) {
+                            speak = true; session.config.speakTranslation = true
+                        }
+                        LangChip(text: "关", selected: !speak) {
+                            speak = false; session.config.speakTranslation = false
+                        }
+                    }
+                    Text("译文完成后用系统语音朗读，零下载。播报期间暂停聆听，避免把喇叭里的声音识别进来；点任意一条译文可重听。")
                         .font(.system(size: 12))
                         .foregroundColor(Theme.dim)
                         .padding(.top, 8)

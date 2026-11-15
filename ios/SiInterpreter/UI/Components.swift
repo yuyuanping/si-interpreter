@@ -87,6 +87,7 @@ struct ProgressBar: View {
 
 struct UtteranceRow: View {
     let u: Utterance
+    var onTap: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -110,6 +111,7 @@ struct UtteranceRow: View {
         .padding(.vertical, 5)
         .padding(12)
         .cellBackground(Theme.cell, cornerRadius: 10)
+        .onTapGesture { onTap?() }
     }
 }
 
