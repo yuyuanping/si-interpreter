@@ -33,7 +33,7 @@ jobs:
           ls -la
 
       - name: Build llama.cpp static libs
-        run: ./ios/scripts/build-llama.sh
+        run: sh ./ios/scripts/build-llama.sh
 
       - name: Generate Xcode project
         run: cd ios && xcodegen generate
