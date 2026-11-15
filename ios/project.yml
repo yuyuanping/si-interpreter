@@ -1,0 +1,66 @@
+# XcodeGen project definition for the iOS port.
+#   brew install xcodegen cmake   (cmake only for scripts/build-llama.sh)
+#   ./scripts/build-llama.sh      (builds llama.cpp static libs first)
+#   download the sherpa-onnx iOS xcframework into Frameworks/ (see README)
+#   xcodegen generate && open SiInterpreter.xcodeproj
+name: SiInterpreter
+options:
+  bundleIdPrefix: com.qoder
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"          # language version (5.9 would be rejected as invalid)
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""          # set your team in Xcode, or here
+    CLANG_CXX_LANGUAGE_STANDARD: c++17
+    GCC_C_LANGUAGE_STANDARD: c11
+
+targets:
+  SiInterpreter:
+    type: application
+    platform: iOS
+    sources:
+      - path: SiInterpreter
+    dependencies:
+      # sherpa-onnx C API incl. statically-linked onnxruntime; ships its own
+      # module map, so Swift imports it as `import SherpaOnnxC`
+      - framework: Frameworks/SherpaOnnxC.xcframework
+        embed: true
+      # llama.cpp static libs produced by scripts/build-llama.sh
+      - framework: llama-libs/libllama.a
+      - framework: llama-libs/libggml.a
+      - framework: llama-libs/libggml-base.a
+      - framework: llama-libs/libggml-cpu.a
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.qoder.si.ios
+        PRODUCT_NAME: SiInterpreter
+        # the vendored llama.cpp lives next to the Android app's native sources;
+        # both platforms build the same source tree
+        HEADER_SEARCH_PATHS: "$(SRCROOT)/../app/src/main/cpp/llama.cpp/include $(SRCROOT)/../app/src/main/cpp/llama.cpp/ggml/include"
+        SWIFT_OBJC_BRIDGING_HEADER: SiInterpreter/Native/SiInterpreter-Bridging.h
+        TARGETED_DEVICE_FAMILY: "1"
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    info:
+      path: SiInterpreter/Info.plist
+      properties:
+        CFBundleDisplayName: 同声传译
+        UILaunchScreen: {}
+        NSMicrophoneUsageDescription: 麦克风用于实时语音识别与离线翻译
+        # keep capturing (and therefore interpreting) when the screen locks
+        UIBackgroundModes: [audio]
+        # expose Documents/ in Finder + Files app so model bundles can be dropped in
+        # from a computer without any network
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+
+schemes:
+  SiInterpreter:
+    build:
+      targets:
+        SiInterpreter: all
+    run:
+      config: Debug

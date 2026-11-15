@@ -1,0 +1,61 @@
+# Builds an UNSIGNED SiInterpreter.ipa on a GitHub macOS runner — the no-Mac path.
+# An unsigned ipa cannot install directly; sign it on the PC with Sideloadly /
+# 爱思助手 + your Apple ID (free cert = 7-day validity, re-sign to refresh).
+#
+# Trigger: Actions tab → ios-ipa → Run workflow, or push changes touching ios/.
+name: ios-ipa
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - "app/src/main/cpp/llama.cpp/**"
+      - ".github/workflows/ios-ipa.yml"
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: brew install cmake xcodegen
+
+      - name: Fetch sherpa-onnx iOS framework
+        run: |
+          mkdir -p ios/Frameworks && cd ios/Frameworks
+          curl -fLO https://github.com/k2-fsa/sherpa-onnx/releases/download/xcframework/sherpa-onnx-v2.0.1-ios-shared-onnxruntime-static.xcframework.zip
+          unzip -q sherpa-onnx-v2.0.1-ios-shared-onnxruntime-static.xcframework.zip
+          ls -la
+
+      - name: Build llama.cpp static libs
+        run: ./ios/scripts/build-llama.sh
+
+      - name: Generate Xcode project
+        run: cd ios && xcodegen generate
+
+      - name: Build unsigned .app
+        run: |
+          cd ios
+          xcodebuild -project SiInterpreter.xcodeproj -scheme SiInterpreter \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tail -60
+
+      - name: Package unsigned .ipa
+        run: |
+          cd ios/build/Build/Products/Release-iphoneos
+          mkdir Payload
+          cp -R SiInterpreter.app Payload/
+          zip -qry "$GITHUB_WORKSPACE/SiInterpreter-unsigned.ipa" Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SiInterpreter-unsigned-ipa
+          path: SiInterpreter-unsigned.ipa
+          retention-days: 14
